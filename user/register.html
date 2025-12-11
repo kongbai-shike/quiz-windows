@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Register - Quiz Game</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;font-family:sans-serif;}
+    body{
+      background: linear-gradient(135deg, #f5efe6 0%, #e8dfd1 100%);
+      display:flex;justify-content:center;align-items:center;min-height:100vh;padding:1rem;
+    }
+    .container{
+      background:#fff;padding:2.5rem;border-radius:1rem;
+      box-shadow:0 15px 35px rgba(0,0,0,0.1);max-width:450px;width:100%;text-align:center;
+    }
+    h1{color:#e86a33;margin-bottom:1.5rem;font-size:2.2rem;font-weight:700;}
+    .form-group{margin-bottom:1.2rem;text-align:left;}
+    label{display:block;margin-bottom:0.4rem;color:#333;font-weight:600;font-size:1rem;}
+    input{
+      width:100%;padding:12px 14px;border:2px solid #e0d6c8;border-radius:10px;font-size:1rem;
+      transition:all 0.3s;background-color:#f9f7f3;
+    }
+    input:focus{
+      outline:none;border-color:#e86a33;background-color:#fff;
+      box-shadow:0 0 0 3px rgba(232,106,51,0.1);
+    }
+    .error{display:none;margin-top:6px;font-size:0.9rem;color:#dc3545;}
+    button{
+      background:#e86a33;color:#fff;border:none;padding:14px 28px;border-radius:10px;
+      font-size:1.05rem;font-weight:600;cursor:pointer;transition:all 0.3s;width:100%;margin-top:0.5rem;
+      box-shadow:0 4px 6px rgba(232,106,51,0.2);
+    }
+    button:hover{background:#d35b28;transform:translateY(-2px);box-shadow:0 6px 8px rgba(232,106,51,0.3);}
+    button:active{transform:translateY(0);}
+    .msg{margin-top:10px;padding:10px 12px;border-radius:10px;display:none;font-size:0.95rem;text-align:left;}
+    .msg.error{background:#ce8484;border:2px solid #ffbdbd;color:#fff;}
+    .msg.success{background:#e6fff0;border:2px solid #a3f0c4;color:#28a745;}
+    .login-link{margin-top:1.2rem;color:#666;font-size:0.95rem;}
+    .login-link a{color:#e86a33;text-decoration:none;font-weight:600;}
+    .login-link a:hover{text-decoration:underline;}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>注册</h1>
+
+    <div class="form-group">
+      <label for="username">用户名</label>
+      <input type="text" id="username" placeholder="请输入用户名（字母或数字）">
+      <div id="username-error" class="error">请输入用户名</div>
+    </div>
+
+    <div class="form-group">
+      <label for="password">密码</label>
+      <input type="password" id="password" placeholder="请输入密码（至少6位）">
+      <div id="password-error" class="error">请输入密码（至少6位）</div>
+    </div>
+
+    <div class="form-group">
+      <label for="confirm-password">确认密码</label>
+      <input type="password" id="confirm-password" placeholder="请再次输入密码">
+      <div id="confirm-error" class="error">两次输入的密码不一致</div>
+    </div>
+
+    <button id="register-btn">注册</button>
+
+    <div id="msg-box" class="msg"></div>
+
+    <div class="login-link">
+      已有账号？<a href="login.html" id="login-link">去登录</a>
+    </div>
+  </div>
+
+  <script>
+    const usernameEl = document.getElementById('username');
+    const passwordEl = document.getElementById('password');
+    const confirmEl = document.getElementById('confirm-password');
+    const usernameErr = document.getElementById('username-error');
+    const passwordErr = document.getElementById('password-error');
+    const confirmErr = document.getElementById('confirm-error');
+    const msgBox = document.getElementById('msg-box');
+
+    function showMsg(type, text){
+      msgBox.className = 'msg ' + (type === 'success' ? 'success' : 'error');
+      msgBox.textContent = text;
+      msgBox.style.display = 'block';
+    }
+    function clearMsg(){
+      msgBox.style.display = 'none';
+      msgBox.textContent = '';
+      msgBox.className = 'msg';
+    }
+
+    document.getElementById('register-btn').addEventListener('click', function() {
+      clearMsg();
+
+      const username = usernameEl.value.trim();
+      const password = passwordEl.value.trim();
+      const confirmPassword = confirmEl.value.trim();
+
+      usernameErr.style.display = 'none';
+      passwordErr.style.display = 'none';
+      confirmErr.style.display = 'none';
+
+      let isValid = true;
+
+      if (!username) { usernameErr.style.display = 'block'; isValid = false; }
+      if (!password || password.length < 6) { passwordErr.style.display = 'block'; isValid = false; }
+      if (password !== confirmPassword) { confirmErr.style.display = 'block'; isValid = false; }
+      if (username && !/^[a-zA-Z0-9]+$/.test(username)) {
+        showMsg('error', '用户名仅支持字母和数字');
+        isValid = false;
+      }
+      if (!isValid) return;
+
+      // 恢复为直连后端 8080
+      axios.post('http://127.0.0.1:8080/register', {
+        username: username,
+        password: password,
+        checkpassword: confirmPassword
+      })
+      .then(function(response) {
+        const res = response.data;
+        if (res.code === 1) {
+          showMsg('success', res.msg || '注册成功！正在跳转登录页...');
+          setTimeout(() => { window.location.href = 'login.html'; }, 800);
+        } else {
+          showMsg('error', res.msg || '注册失败');
+        }
+      })
+      .catch(function(error) {
+        const status = error?.response?.status;
+        const backendMsg = error?.response?.data?.msg;
+        showMsg('error', backendMsg ? `注册失败：${backendMsg}` : status ? `请求失败（HTTP ${status}）` : '网络错误，请稍后重试');
+        console.error(error);
+      });
+    });
+  </script>
+</body>
+</html>

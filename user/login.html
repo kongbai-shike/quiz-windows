@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{
+      background:#f5efe6;
+      display:flex;justify-content:center;align-items:center;
+      min-height:100vh;padding:1rem;font-family:sans-serif;
+    }
+    .container{
+      background:#fff;padding:2rem;border-radius:1rem;
+      box-shadow:0 10px 30px rgba(0,0,0,0.1);
+      max-width:520px;width:100%;overflow:hidden;position:relative;
+    }
+    .screen{display:block;padding:2rem;text-align:center;}
+    .header h1{color:#e86a33;margin-bottom:16px;font-size:2rem;}
+    .header p{color:#666;margin-bottom:24px;font-size:1rem;}
+    .form{display:flex;flex-direction:column;gap:14px;text-align:left;}
+    .form-group{display:flex;flex-direction:column;gap:8px;}
+    label{color:#333;font-weight:600;}
+    input[type="text"], input[type="password"]{
+      background:#f8f0e5;color:#333;border:2px solid #eadbc8;border-radius:10px;
+      padding:12px 14px;outline:none;transition:all .2s;font-size:1rem;
+    }
+    input[type="text"]:focus, input[type="password"]:focus{background:#fff7ee;border-color:#dac0ae;}
+    .actions{margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+    .checkbox{display:flex;align-items:center;gap:8px;color:#666;font-size:.95rem;}
+    button{
+      background:#e86a33;color:#fff;border:none;padding:12px 22px;border-radius:10px;
+      font-size:1rem;cursor:pointer;transition:background-color .3s, transform .06s ease;
+    }
+    button:hover{background:#d35b28;}
+    button:active{transform:scale(0.98);}
+    .error, .success{
+      display:none;margin-top:8px;border-radius:10px;padding:10px 12px;font-size:.95rem;
+    }
+    .error{background:#ce8484;border:2px solid #ffbdbd;color:#fff;}
+    .success{background:#e6fff0;border:2px solid #a3f0c4;color:#28a745;}
+    .progress-bar{background:#f8f0e5;border-radius:5px;overflow:hidden;height:10px;margin-top:20px;}
+    .progress{height:100%;background:#e86a33;width:0%;transition:width .3s;}
+    .footer{margin-top:18px;color:#666;font-size:.95rem;display:flex;justify-content:space-between;align-items:center;}
+    .corner-register{
+      position:fixed;right:16px;bottom:16px;display:flex;gap:8px;align-items:center;
+      background:#fff;border:2px solid #eadbc8;border-radius:12px;padding:8px 12px;
+      box-shadow:0 8px 24px rgba(0,0,0,0.08);
+    }
+    .corner-register span{color:#666;font-size:.95rem;}
+    .corner-register a{color:#e86a33;text-decoration:none;font-weight:700;transition:color .2s;}
+    .corner-register a:hover{color:#d35b28;text-decoration:underline;}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.7.7/dist/axios.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="screen" id="login-screen">
+      <div class="header">
+        <h1>登录</h1>
+        <p>欢迎回来，请输入您的账号与密码</p>
+      </div>
+
+      <form class="form" id="login-form" novalidate>
+        <div class="form-group">
+          <label for="username">用户名</label>
+          <input id="username" name="username" type="text" placeholder="请输入用户名" autocomplete="username" />
+        </div>
+
+        <div class="form-group">
+          <label for="password">密码</label>
+          <input id="password" name="password" type="password" placeholder="请输入密码" autocomplete="current-password" />
+        </div>
+
+        <div class="actions">
+          <div class="checkbox">
+            <input id="remember" type="checkbox"/>
+            <label for="remember">记住我</label>
+          </div>
+          <button type="submit" id="login-btn">登录</button>
+        </div>
+
+        <div class="error" id="error-box">用户名或密码不正确</div>
+        <div class="success" id="success-box">登录成功，正在跳转...</div>
+
+        <div class="progress-bar" aria-hidden="true">
+          <div id="progress" class="progress"></div>
+        </div>
+
+        <div class="footer">
+          <span>忘记密码？</span>
+          <a href="#" id="forgot-link">找回</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="corner-register" aria-label="去注册">
+    <span>还没有账号？</span>
+    <a href="register.html" id="register-link">注册</a>
+  </div>
+
+  <script>
+    const form = document.getElementById('login-form');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const errorBox = document.getElementById('error-box');
+    const successBox = document.getElementById('success-box');
+    const progressBar = document.getElementById('progress');
+    const loginBtn = document.getElementById('login-btn');
+
+    let submitting = false;
+
+    // 恢复为直连后端 8080
+    const axiosInstance = axios.create({
+      baseURL: 'http://127.0.0.1:8080',
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 10000
+    });
+    const LOGIN_PATH = '/login';
+
+    function setProgress(p){ progressBar.style.width = p + '%'; }
+    function showError(msg){ errorBox.textContent = msg; errorBox.style.display = 'block'; successBox.style.display = 'none'; }
+    function showSuccess(msg){ successBox.textContent = msg; successBox.style.display = 'block'; errorBox.style.display = 'none'; }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (submitting) return;
+
+      const username = usernameInput.value.trim();
+      const password = passwordInput.value.trim();
+      if (!username) return showError('请输入用户名');
+      if (!password) return showError('请输入密码');
+
+      submitting = true;
+      loginBtn.disabled = true;
+      setProgress(30);
+
+      try{
+        const resp = await axiosInstance.post(LOGIN_PATH, { username, password });
+        setProgress(70);
+        const { code, msg, data } = resp.data ?? {};
+        if (code === 1) {
+          const token = (data && (data.token ?? data)) || '';
+          if (token) localStorage.setItem('token', token);
+          showSuccess('登录成功，正在跳转...');
+          setProgress(100);
+          setTimeout(()=>location.href='quiz.html', 500);
+        } else {
+          showError(msg || '用户登录失败');
+          setProgress(0);
+        }
+      }catch(err){
+        showError(`请求失败${err?.response?.status ? '（HTTP '+err.response.status+'）' : ''}`);
+        setProgress(0);
+      }finally{
+        submitting = false;
+        loginBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

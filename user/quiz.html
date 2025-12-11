@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Quiz Game</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{
+      background:#f5efe6;display:flex;justify-content:center;align-items:center;
+      min-height:100vh;padding:1rem;font-family:sans-serif;
+    }
+    .container{background:#fff;padding:2rem;border-radius:1rem;box-shadow:0 10px 30px rgba(0,0,0,0.1);
+      max-width:600px;width:100%;overflow:hidden;position:relative;}
+    .screen{display:none;padding:2rem;text-align:center;}
+    .screen.active{display:block;}
+    #start-screen h1{color:#e86a33;margin-bottom:20px;font-size:2.5rem;}
+    #start-screen p{color:#666;margin-bottom:30px;font-size:1.1rem;}
+    button{background:#e86a33;color:#fff;border:none;padding:15px 30px;border-radius:10px;font-size:1.1rem;cursor:pointer;transition:background-color .3s;}
+    button:hover{background:#d35b28;}
+    .quiz-header{margin-bottom:1rem;}
+    #question-text{color:#333;font-size:1.5rem;margin-bottom:1rem;}
+    .quiz-info{display:flex;justify-content:space-between;color:#666;margin-bottom:10px;}
+    .answer-container{display:flex;flex-direction:column;gap:10px;margin-top:20px;}
+    .answer-btn{background:#f8f0e5;color:#333;border:2px solid #eadbc8;border-radius:10px;padding:1rem;cursor:pointer;text-align:left;transition:all .3s;}
+    .answer-btn:hover{background:#eadbc8;border-color:#dac0ae;}
+    .answer-btn.correct{background:#e6fff0;border-color:#a3f0c4;color:#28a745;}
+    .answer-btn.incorrect{background:#ce8484;border-color:#ffbdbd;color:#dc3545;}
+    .progress-bar{background:#f8f0e5;border-radius:5px;overflow:hidden;height:10px;margin-bottom:20px;}
+    .progress{height:100%;background:#e86a33;width:0%;transition:width .3s;}
+    #result-screen h1{color:#e86a33;margin-bottom:30px;}
+    .result-info{background:#f8f0e5;border-radius:10px;padding:20px;margin-bottom:30px;}
+    .result-message{font-size:1.5rem;font-weight:600;color:#e86a33;}
+    .notice{margin-top:12px;color:#dc3545;font-size:.95rem;display:none;}
+    @media(max-width:500px){
+      .screen{padding:1rem;}
+      #start-screen h1{font-size:2rem;}
+      #question-text{font-size:1.3rem;}
+      .answer-btn{padding:12px;}
+      button{padding:12px 25px;font-size:1rem;}
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="screen active" id="start-screen">
+      <h1>Quiz Game</h1>
+      <p>Test your knowledge with these questions!</p>
+      <button id="start-btn">Start Quiz</button>
+      <div id="start-notice" class="notice"></div>
+    </div>
+
+    <div class="screen" id="quiz-screen">
+      <div class="quiz-header">
+        <h2 id="question-text">Question goes here</h2>
+        <div class="quiz-info">
+          <p>Question <span id="current-question">1</span> of  <span id="total-questions">5</span></p>
+          <p>Score: <span id="score">0</span></p>
+        </div>
+      </div>
+
+      <div class="answer-container" id="answers-container"></div>
+
+      <div class="progress-bar">
+        <div id="progress" class="progress"></div>
+      </div>
+    </div>
+
+    <div class="screen" id="result-screen">
+      <h1>Quiz Result!</h1>
+      <div class="result-info">
+        <p>Your score: <span id="final-score">0</span> / <span id="max-score">5</span></p>
+        <div class="result-message" id="result-message">Good job!</div>
+      </div>
+      <button id="restart-btn">Restart Quiz</button>
+    </div>
+  </div>
+
+  <script>
+    // DOM
+    const startScreen = document.getElementById("start-screen");
+    const quizScreen = document.getElementById("quiz-screen");
+    const resultScreen = document.getElementById("result-screen");
+    const startButton = document.getElementById("start-btn");
+    const questionText = document.getElementById("question-text");
+    const answersContainer = document.getElementById("answers-container");
+    const currentQuestionSpan = document.getElementById("current-question");
+    const totalQuestionsSpan = document.getElementById("total-questions");
+    const scoreSpan = document.getElementById("score");
+    const finalScoreSpan = document.getElementById("final-score");
+    const maxScoreSpan = document.getElementById("max-score");
+    const resultMessage = document.getElementById("result-message");
+    const restartButton = document.getElementById("restart-btn");
+    const progressBar = document.getElementById("progress");
+    const startNotice = document.getElementById("start-notice");
+
+    // 后端题目数组
+    let quizQuestions = [];
+
+    // 恢复为直连后端 8080
+    const axiosApi = axios.create({
+      baseURL: 'http://127.0.0.1:8080',
+      withCredentials: true,
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 10000
+    });
+    const GET_QUESTION_PATH = '/getQuestion';
+
+    // 拉题并开始
+    startButton.addEventListener("click", fetchQuestionsAndStart);
+
+    async function fetchQuestionsAndStart() {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        alert('请先登录');
+        window.location.href = 'login.html';
+        return;
+      }
+
+      startNotice.style.display = 'none';
+
+      try {
+        const response = await axiosApi.get(GET_QUESTION_PATH, {
+          headers: { token }
+        });
+        const res = response.data;
+        if (res.code === 1 && Array.isArray(res.data)) {
+          quizQuestions = res.data;
+          totalQuestionsSpan.textContent = quizQuestions.length;
+          maxScoreSpan.textContent = quizQuestions.length;
+          startQuiz();
+        } else {
+          alert(res.msg || '获取题目失败');
+        }
+      } catch (error) {
+        console.error('[Quiz] 请求题目失败:', error);
+        const status = error?.response?.status;
+        const backendMsg = error?.response?.data?.msg;
+        startNotice.textContent = backendMsg
+          ? `获取题目失败：${backendMsg}`
+          : status
+            ? `请求失败（HTTP ${status}），请检查跨域与登录状态`
+            : '网络错误，请稍后重试';
+        startNotice.style.display = 'block';
+      }
+    }
+
+    // Restart 时也重新拉取新题目
+    restartButton.addEventListener("click", async () => {
+      resultScreen.classList.remove("active");
+      await fetchQuestionsAndStart();
+    });
+
+    // 状态
+    let currentQuestionIndex = 0;
+    let score = 0;
+    let answersDisabled = false;
+
+    function startQuiz() {
+      currentQuestionIndex = 0;
+      score = 0;
+      scoreSpan.textContent = 0;
+
+      startScreen.classList.remove("active");
+      quizScreen.classList.add("active");
+      resultScreen.classList.remove("active");
+
+      showQuestion();
+    }
+
+    function showQuestion() {
+      answersDisabled = false;
+
+      if (!quizQuestions.length) {
+        questionText.textContent = 'No questions available.';
+        answersContainer.innerHTML = '';
+        return;
+      }
+
+      const currentQuestion = quizQuestions[currentQuestionIndex];
+      currentQuestionSpan.textContent = currentQuestionIndex + 1;
+
+      const progressPercent = (currentQuestionIndex / quizQuestions.length) * 100;
+      progressBar.style.width = progressPercent + "%";
+      questionText.textContent = currentQuestion.question;
+      answersContainer.innerHTML = "";
+
+      currentQuestion.answers.forEach((answer) => {
+        const button = document.createElement("button");
+        button.textContent = answer.text;
+        button.classList.add("answer-btn");
+        button.dataset.correct = String(answer.correct);
+        button.addEventListener("click", selectAnswer);
+        answersContainer.appendChild(button);
+      });
+    }
+
+    function selectAnswer(event) {
+      if (answersDisabled) return;
+      answersDisabled = true;
+
+      const selectedButton = event.target;
+      const isCorrect = selectedButton.dataset.correct === "true";
+
+      Array.from(answersContainer.children).forEach((button) => {
+        if (button.dataset.correct === "true") {
+          button.classList.add("correct");
+        } else if (button === selectedButton) {
+          button.classList.add("incorrect");
+        }
+      });
+
+      if (isCorrect) {
+        score++;
+        scoreSpan.textContent = score;
+      }
+
+      setTimeout(() => {
+        currentQuestionIndex++;
+        if (currentQuestionIndex < quizQuestions.length) {
+          showQuestion();
+        } else {
+          showResults();
+        }
+      }, 1000);
+    }
+
+    function showResults() {
+      quizScreen.classList.remove("active");
+      resultScreen.classList.add("active");
+
+      finalScoreSpan.textContent = score;
+
+      const percentage = (score / quizQuestions.length) * 100;
+
+      if (percentage === 100) {
+        resultMessage.textContent = "Perfect! You're a genius!";
+      } else if (percentage >= 80) {
+        resultMessage.textContent = "Great job! You know your stuff!";
+      } else if (percentage >= 60) {
+        resultMessage.textContent = "Good effort! Keep learning!";
+      } else if (percentage >= 40) {
+        resultMessage.textContent = "Not bad! Try again to improve!";
+      } else {
+        resultMessage.textContent = "Keep studying! You'll get better!";
+      }
+    }
+  </script>
+</body>
+</html>
