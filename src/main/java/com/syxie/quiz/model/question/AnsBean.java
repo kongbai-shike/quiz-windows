@@ -1,0 +1,36 @@
+package com.syxie.quiz.model.question;
+
+public class AnsBean{
+    private String text;
+    private boolean correct;
+    //类构造方法；
+    public AnsBean(String text, boolean correct) {
+        this.text = text;
+        this.correct = correct;
+    }
+    //setter.getter.
+
+    public String getText() {
+        return text;
+    }
+
+    public void setText(String text) {
+        this.text = text;
+    }
+
+    public boolean isCorrect() {
+        return correct;
+    }
+
+    public void setCorrect(boolean correct) {
+        this.correct = correct;
+    }
+
+    @Override
+    public String toString() {
+        return "AnsBean{" +
+                "text='" + text + '\'' +
+                ", correct=" + correct +
+                '}';
+    }
+}
